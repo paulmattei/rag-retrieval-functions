@@ -46,14 +46,38 @@ tokenised_data = bm25s.tokenize(corpus)
 # Index the tokenised chunks within this retriever
 BM25_RETRIEVER.index(tokenised_data)
 
-# Tokenise the query
-sample_query = "What are the recent news about GDP?"
-tokenised_sample_query = bm25s.tokenize(sample_query)
 
-# Get the retrieved results and their respective scores
-results, scores = BM25_RETRIEVER.retrieve(tokenised_sample_query, k=3)
+def bm25_retrieve(query: str, top_k: int = 5):
+    """
+    Retrieves the top k relevant documents for a given query using the BM25 algorithm.
 
-print(f"Results for query: {sample_query}\n")
+    This function tokenises the input query and uses a pre-indexed BM25 reciever to
+    search through a collection of documents. It returns the indices of the top k
+    documents that are most relevant to the the query.
 
-for doc in results[0][0]:
-    print(f"Document retrieved {corpus.index(doc)} : {doc}")
+    Args:
+        query (str): The search query for which the documents need to be retrieved.
+        top_k (int): The number of top relevant documents to retrieve. Default is 5.
+
+    Returns:
+        List[int]: A list of indices corresponding to the top k relevant documents
+        within the corpus.
+    """
+
+    # Tokenise the query using the 'tokenize' function from the bm25s module
+    tokenised_query = bm25s.tokenize(query)
+
+    # Use the BM25_RETRIEVER to retrive documents and their scores based on the
+    # tokenised query. Retrieve the top k documents
+    results, scores = BM25_RETRIEVER.retrieve(tokenised_query, k=top_k)
+
+    # Extract the first element to from results to get the list of retrieved documents
+    results = results[0]
+
+    top_k_indices = [corpus.index(result) for result in results]
+
+    return top_k_indices
+
+
+if __name__ == "__main__":
+    bm25_retrieve("What about GDP?")
