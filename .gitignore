@@ -1,4 +1,27 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+
+# Environment variables
 .env
-.pi
+
+# Linter / formatter cache
+.ruff_cache/
+
+# Editor
+.vscode/
+
+# Pi agent
+.pi/
+
+# Generated / large data files
+embeddings.joblib
+news_data_dedup.csv
+
+# Downloaded ML models
+models/

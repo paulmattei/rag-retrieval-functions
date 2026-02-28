@@ -8,12 +8,12 @@ from together import Together
 import numpy as np
 
 
-# Distance formulas. 
+# Distance formulas.
 # In this ungraded lab, distance formulas will be implemented here. However, in future assignments, you will import functions from specialized libraries.
 def cosine_similarity(v1, array_of_vectors):
     """
     Compute the cosine similarity between a vector and an array of vectors.
-    
+
     Parameters:
     v1 (array-like): The first vector.
     array_of_vectors (array-like): An array of vectors or a single vector.
@@ -25,11 +25,11 @@ def cosine_similarity(v1, array_of_vectors):
     v1 = np.array(v1)
     # Initialize a list to store similarities
     similarities = []
-    
+
     # Check if array_of_vectors is a single vector
     if len(np.shape(array_of_vectors)) == 1:
         array_of_vectors = [array_of_vectors]
-    
+
     # Iterate over each vector in the array
     for v2 in array_of_vectors:
         # Convert the current vector to a numpy array
@@ -44,10 +44,11 @@ def cosine_similarity(v1, array_of_vectors):
         similarities.append(similarity)
     return np.array(similarities)
 
+
 def euclidean_distance(v1, array_of_vectors):
     """
     Compute the Euclidean distance between a vector and an array of vectors.
-    
+
     Parameters:
     v1 (array-like): The first vector.
     array_of_vectors (array-like): An array of vectors or a single vector.
@@ -59,18 +60,20 @@ def euclidean_distance(v1, array_of_vectors):
     v1 = np.array(v1)
     # Initialize a list to store distances
     distances = []
-    
+
     # Check if array_of_vectors is a single vector
     if len(np.shape(array_of_vectors)) == 1:
         array_of_vectors = [array_of_vectors]
-    
+
     # Iterate over each vector in the array
     for v2 in array_of_vectors:
         # Convert the current vector to a numpy array
         v2 = np.array(v2)
         # Check if the input arrays have the same shape
         if v1.shape != v2.shape:
-            raise ValueError(f"Shapes don't match: v1 shape: {v1.shape}, v2 shape: {v2.shape}")
+            raise ValueError(
+                f"Shapes don't match: v1 shape: {v1.shape}, v2 shape: {v2.shape}"
+            )
         # Calculate the Euclidean distance and append to the list
         dist = np.sqrt(np.sum((v1 - v2) ** 2))
         distances.append(dist)
@@ -84,71 +87,91 @@ def format_date(date_string):
     formatted_date = date_object.strftime("%Y-%m-%d")
     return formatted_date
 
+
 def pprint(*args, **kwargs):
-    kwargs.setdefault('sort_dicts', False)
+    kwargs.setdefault("sort_dicts", False)
     original_pprint(*args, **kwargs)
-    
-def generate_with_single_input(prompt: str, 
-                               role: str = 'assistant', 
-                               top_p: float = 0, 
-                               temperature: float = 0,
-                               max_tokens: int = 500,
-                               model: str ="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-                               together_api_key = None,
-                              **kwargs):
-    
+
+
+def generate_with_single_input(
+    prompt: str,
+    role: str = "assistant",
+    top_p: float = 0,
+    temperature: float = 0,
+    max_tokens: int = 500,
+    model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    together_api_key=None,
+    **kwargs,
+):
+
     if top_p is None:
-        top_p = 'none'
+        top_p = "none"
     if temperature is None:
-        temperature = 'none'
+        temperature = "none"
 
     payload = {
-            "model": model,
-            "messages": [{'role': role, 'content': prompt}],
-            "top_p": top_p,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            **kwargs
-                  }
-    if (not together_api_key) and ('TOGETHER_API_KEY' not in os.environ):
-        url = os.path.join('https://proxy.dlai.link/coursera_proxy/together', 'v1/chat/completions')   
-        response = requests.post(url, json = payload, verify=False)
+        "model": model,
+        "messages": [{"role": role, "content": prompt}],
+        "top_p": top_p,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        **kwargs,
+    }
+    if (not together_api_key) and ("TOGETHER_API_KEY" not in os.environ):
+        url = os.path.join(
+            "https://proxy.dlai.link/coursera_proxy/together", "v1/chat/completions"
+        )
+        response = requests.post(url, json=payload, verify=False)
         if not response.ok:
             raise Exception(f"Error while calling LLM: f{response.text}")
         try:
             json_dict = json.loads(response.text)
         except Exception as e:
-            raise Exception(f"Failed to get correct output from LLM call.\nException: {e}\nResponse: {response.text}")
+            raise Exception(
+                f"Failed to get correct output from LLM call.\nException: {e}\nResponse: {response.text}"
+            )
     else:
         if together_api_key is None:
-            together_api_key = os.environ['TOGETHER_API_KEY']
-        client = Together(api_key =  together_api_key)
+            together_api_key = os.environ["TOGETHER_API_KEY"]
+        client = Together(api_key=together_api_key)
         json_dict = client.chat.completions.create(**payload).model_dump()
-        json_dict['choices'][-1]['message']['role'] = json_dict['choices'][-1]['message']['role'].name.lower()
+        json_dict["choices"][-1]["message"]["role"] = json_dict["choices"][-1][
+            "message"
+        ]["role"]
     try:
-        output_dict = {'role': json_dict['choices'][-1]['message']['role'], 'content': json_dict['choices'][-1]['message']['content']}
+        output_dict = {
+            "role": json_dict["choices"][-1]["message"]["role"],
+            "content": json_dict["choices"][-1]["message"]["content"],
+        }
     except Exception as e:
-        raise Exception(f"Failed to get correct output dict. Please try again. Error: {e}")
+        raise Exception(
+            f"Failed to get correct output dict. Please try again. Error: {e}"
+        )
     return output_dict
 
+
 # Read the CSV without parsing dates
+
 
 def read_dataframe(path):
     df = pd.read_csv(path)
 
     # Apply the custom date formatting function to the relevant columns
-    df['published_at'] = df['published_at'].apply(format_date)
-    df['updated_at'] = df['updated_at'].apply(format_date)
+    df["published_at"] = df["published_at"].apply(format_date)
+    df["updated_at"] = df["updated_at"].apply(format_date)
 
     # Convert the DataFrame to dictionary after formatting
-    df= df.to_dict(orient='records')
+    df = df.to_dict(orient="records")
     return df
 
 
 import ipywidgets as widgets
 from IPython.display import display, Markdown
 
-def display_widget(llm_call_func, semantic_search_retrieve, bm25_retrieve, reciprocal_rank_fusion):
+
+def display_widget(
+    llm_call_func, semantic_search_retrieve, bm25_retrieve, reciprocal_rank_fusion
+):
     def on_button_click(b):
         query = query_input.value
         top_k = slider.value
@@ -163,31 +186,33 @@ def display_widget(llm_call_func, semantic_search_retrieve, bm25_retrieve, recip
             (output1, llm_call_func, query, True, top_k, semantic_search_retrieve),
             (output2, llm_call_func, query, True, top_k, bm25_retrieve),
             (output3, llm_call_func, query, True, top_k, reciprocal_rank_fusion),
-            (output4, llm_call_func, query, False, top_k, None)
+            (output4, llm_call_func, query, False, top_k, None),
         ]
         for output, func, query, use_rag, top_k, retriever in results:
-            response = func(query=query, use_rag=use_rag, top_k=top_k, retrieve_function=retriever)
+            response = func(
+                query=query, use_rag=use_rag, top_k=top_k, retrieve_function=retriever
+            )
             with output:
                 display(Markdown(response))
         # Clear "Generating..." message
         status_output.clear_output()
-        
+
     query_input = widgets.Text(
-        description='',
-        placeholder='Type your query here',
-        layout=widgets.Layout(width='100%')
+        description="",
+        placeholder="Type your query here",
+        layout=widgets.Layout(width="100%"),
     )
-    
+
     slider = widgets.IntSlider(
         value=5,
         min=1,
         max=20,
         step=1,
-        description='Top K:',
-        style={'description_width': 'initial'}
+        description="Top K:",
+        style={"description_width": "initial"},
     )
-    
-    output_style = {'border': '1px solid #ccc', 'width': '100%'}
+
+    output_style = {"border": "1px solid #ccc", "width": "100%"}
     output1 = widgets.Output(layout=output_style)
     output2 = widgets.Output(layout=output_style)
     output3 = widgets.Output(layout=output_style)
@@ -196,7 +221,7 @@ def display_widget(llm_call_func, semantic_search_retrieve, bm25_retrieve, recip
 
     submit_button = widgets.Button(
         description="Get Responses",
-        style={'button_color': '#eee', 'font_color': 'black'}
+        style={"button_color": "#eee", "font_color": "black"},
     )
     submit_button.on_click(on_button_click)
 
@@ -205,7 +230,8 @@ def display_widget(llm_call_func, semantic_search_retrieve, bm25_retrieve, recip
     label3 = widgets.Label(value="Reciprocal Rank Fusion")
     label4 = widgets.Label(value="Without RAG")
 
-    display(widgets.HTML("""
+    display(
+        widgets.HTML("""
     <style>
         .custom-output {
             background-color: #f9f9f9;
@@ -228,31 +254,35 @@ def display_widget(llm_call_func, semantic_search_retrieve, bm25_retrieve, recip
             border: 1px solid #ddd !important;
         }
     </style>
-    """))
-    
+    """)
+    )
+
     display(query_input, slider, submit_button, status_output)
-    
+
     # Create individual vertical containers for each label and output
-    vbox1 = widgets.VBox([label1, output1], layout={'width': '45%'})
-    vbox2 = widgets.VBox([label2, output2], layout={'width': '45%'})
-    vbox3 = widgets.VBox([label3, output3], layout={'width': '45%'})
-    vbox4 = widgets.VBox([label4, output4], layout={'width': '45%'})
-    
+    vbox1 = widgets.VBox([label1, output1], layout={"width": "45%"})
+    vbox2 = widgets.VBox([label2, output2], layout={"width": "45%"})
+    vbox3 = widgets.VBox([label3, output3], layout={"width": "45%"})
+    vbox4 = widgets.VBox([label4, output4], layout={"width": "45%"})
+
     # HBoxes to arrange two VBoxes in each row
-    hbox_outputs1 = widgets.HBox([vbox1, vbox2], layout={'justify_content': 'space-between'})
-    hbox_outputs2 = widgets.HBox([vbox3, vbox4], layout={'justify_content': 'space-between'})
+    hbox_outputs1 = widgets.HBox(
+        [vbox1, vbox2], layout={"justify_content": "space-between"}
+    )
+    hbox_outputs2 = widgets.HBox(
+        [vbox3, vbox4], layout={"justify_content": "space-between"}
+    )
 
     def style_outputs(*outputs):
         for output in outputs:
-            output.layout.margin = '5px'
-            output.layout.height = '300px'
-            output.layout.padding = '10px'
-            output.layout.overflow = 'auto'
+            output.layout.margin = "5px"
+            output.layout.height = "300px"
+            output.layout.padding = "10px"
+            output.layout.overflow = "auto"
             output.add_class("custom-output")
-            
+
     style_outputs(output1, output2, output3, output4)
-    
+
     # Display two rows with two outputs each
     display(hbox_outputs1)
     display(hbox_outputs2)
-
