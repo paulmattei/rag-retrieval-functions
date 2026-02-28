@@ -6,6 +6,9 @@ from pprint import pprint as original_pprint
 import os
 from together import Together
 import numpy as np
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # Distance formulas.

@@ -15,28 +15,8 @@ from utils import (
     display_widget,
 )
 
-NEWS_DATA = read_dataframe("news_data_dedup.csv")
 
-# The corpus used will be the title appended with the description
-corpus = [x["title"] + " " + x["description"] for x in NEWS_DATA]
-
-# Instantiate the retriever by passing the corpus data
-BM25_RETRIEVER = bm25s.BM25(corpus=corpus)
-
-# Tokenise the chunks
-tokenised_data = bm25s.tokenize(corpus)
-
-# Index the tokenised chunks within this retriever
-BM25_RETRIEVER.index(tokenised_data)
-
-
-EMBEDDINGS = joblib.load("embeddings.joblib")
-
-model_name = "models/BAAI/bge-base-en-v1.5"
-model = SentenceTransformer(model_name)
-
-
-def query_news(indices):
+def query_news(indices, NEWS_DATA):
     """
     Retrieves elements from a dataset based on specified indices.
 
@@ -55,7 +35,7 @@ def query_news(indices):
     return output
 
 
-def bm25_retrieve(query: str, top_k: int = 5):
+def bm25_retrieve(query: str, bm25_retriever, corpus, top_k: int = 5):
     """
     Retrieves the top k relevant documents for a given query using the BM25 algorithm.
 
@@ -75,9 +55,9 @@ def bm25_retrieve(query: str, top_k: int = 5):
     # Tokenise the query using the 'tokenize' function from the bm25s module
     tokenised_query = bm25s.tokenize(query)
 
-    # Use the BM25_RETRIEVER to retrive documents and their scores based on the
+    # Use the bm25_retriever to retrive documents and their scores based on the
     # tokenised query. Retrieve the top k documents
-    results, scores = BM25_RETRIEVER.retrieve(tokenised_query, k=top_k)
+    results, scores = bm25_retriever.retrieve(tokenised_query, k=top_k)
 
     # Extract the first element to from results to get the list of retrieved documents
     results = results[0]
@@ -87,7 +67,12 @@ def bm25_retrieve(query: str, top_k: int = 5):
     return top_k_indices
 
 
-def semantic_search_retrieve(query, top_k=5):
+def semantic_search_retrieve(
+    query,
+    model,
+    embeddings,
+    top_k=5,
+):
     """
     Retrieves the top k relevant documents for a given query using semantic search and
     cosine similarity.
@@ -108,7 +93,7 @@ def semantic_search_retrieve(query, top_k=5):
     query_embedding = model.encode(query)
 
     # Calculate the cosine similarity scores in descending order to get the indices
-    similarity_scores = cosine_similarity(query_embedding, EMBEDDINGS)
+    similarity_scores = cosine_similarity(query_embedding, embeddings)
 
     # Sort the similarity scores in descending order and get the indices
     similarity_indices = np.argsort(-similarity_scores)
@@ -163,7 +148,17 @@ def reciprocal_rank_fusion(list1, list2, top_k=5, K=60):
     return top_k_indices
 
 
-def generate_final_prompt(query, top_k, retrieve_function=None, use_rag=True):
+def generate_final_prompt(
+    query,
+    top_k,
+    model,
+    embeddings,
+    bm25_retriever,
+    corpus,
+    news_data,
+    retrieve_function=None,
+    use_rag=True,
+):
     """
     Generates an augmented prompt for a Retrieval Augmented Generation system by
     retrieving the top_k most relevant documents based on a given query.
@@ -193,8 +188,8 @@ def generate_final_prompt(query, top_k, retrieve_function=None, use_rag=True):
     # Determine which retrieve function to use based on it's name.
     if retrieve_function.__name__ == "reciprocal_rank_fusion":
         # Retrieve top documents using two different methods.
-        list1 = semantic_search_retrieve(query, top_k)
-        list2 = bm25_retrieve(query, top_k)
+        list1 = semantic_search_retrieve(query, model, embeddings, top_k)
+        list2 = bm25_retrieve(query, bm25_retriever, corpus, top_k)
         # Combine the results using reciprocal rank fusion.
         top_k_indices = retrieve_function(list1, list2, top_k)
     else:
@@ -202,7 +197,7 @@ def generate_final_prompt(query, top_k, retrieve_function=None, use_rag=True):
         top_k_indices = retrieve_function(query=query, top_k=top_k)
 
     # Retrieve documents from the dataset using the indices.
-    relevant_documents = query_news(top_k_indices)
+    relevant_documents = query_news(top_k_indices, news_data)
 
     formatted_documents = []
 
@@ -231,10 +226,28 @@ def generate_final_prompt(query, top_k, retrieve_function=None, use_rag=True):
     return prompt
 
 
-def llm_call(query, retrieve_function=None, top_k=5, use_rag=True):
+def llm_call(
+    query,
+    model,
+    embeddings,
+    bm25_retriever,
+    corpus,
+    news_data,
+    retrieve_function=None,
+    top_k=5,
+    use_rag=True,
+):
     # Get the system and user dictionaires
     prompt = generate_final_prompt(
-        query, top_k=top_k, retrieve_function=retrieve_function, use_rag=use_rag
+        query,
+        top_k=top_k,
+        model=model,
+        embeddings=embeddings,
+        bm25_retriever=bm25_retriever,
+        corpus=corpus,
+        news_data=news_data,
+        retrieve_function=retrieve_function,
+        use_rag=use_rag,
     )
     generated_response = generate_with_single_input(prompt)
     generated_message = generated_response["content"]
@@ -242,11 +255,41 @@ def llm_call(query, retrieve_function=None, top_k=5, use_rag=True):
 
 
 def main():
+
+    news_data = read_dataframe("news_data_dedup.csv")
+
+    # The corpus used will be the title appended with the description
+    corpus = [x["title"] + " " + x["description"] for x in news_data]
+
+    # Instantiate the retriever by passing the corpus data
+    bm25_retriever = bm25s.BM25(corpus=corpus)
+
+    # Tokenise the chunks
+    tokenised_data = bm25s.tokenize(corpus)
+
+    # Index the tokenised chunks within this retriever
+    bm25_retriever.index(tokenised_data)
+
+    embeddings = joblib.load("embeddings.joblib")
+
+    model_name = "models/BAAI/bge-base-en-v1.5"
+    model = SentenceTransformer(model_name)
+
     query = "What do we know about GDP?"
     #    keyword_list = bm25_retrieve(query)
     #    semantic_list = semantic_search_retrieve(query)
     #    reciprocal_rank_fusion(keyword_list, semantic_list)
-    print(llm_call(query, retrieve_function=reciprocal_rank_fusion))
+    print(
+        llm_call(
+            query,
+            model,
+            embeddings,
+            bm25_retriever,
+            corpus,
+            news_data,
+            retrieve_function=reciprocal_rank_fusion,
+        )
+    )
 
 
 if __name__ == "__main__":
